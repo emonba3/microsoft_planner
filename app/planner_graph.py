@@ -32,52 +32,59 @@ def _authorize_url() -> str:
     return f"{_tenant_base()}/oauth2/v2.0/authorize"
 
 
-def build_microsoft_auth_url(state: str, *, code_challenge: Optional[str] = None) -> str:
-    if not (MS_CLIENT_ID and MS_REDIRECT_URI):
-        raise RuntimeError("MS_CLIENT_ID / MS_REDIRECT_URI are not set")
+from urllib.parse import urlencode
+import os
+
+def build_microsoft_auth_url(state: str, code_challenge: str | None = None) -> str:
+    tenant = os.environ["MS_TENANT_ID"]
+    client_id = os.environ["MS_CLIENT_ID"]
+    redirect_uri = os.environ["MS_REDIRECT_URI"]
+    scopes = os.environ.get(
+        "MS_GRAPH_SCOPES",
+        "openid profile email offline_access User.Read Group.Read.All GroupMember.Read.All Tasks.Read",
+    )
 
     params = {
-        "client_id": MS_CLIENT_ID,
+        "client_id": client_id,
         "response_type": "code",
-        "redirect_uri": MS_REDIRECT_URI,
+        "redirect_uri": redirect_uri,
         "response_mode": "query",
-        "scope": MS_SCOPES,
+        "scope": scopes,
         "state": state,
     }
+
     if code_challenge:
         params["code_challenge"] = code_challenge
         params["code_challenge_method"] = "S256"
-    return f"{_authorize_url()}?{urlencode(params)}"
+
+    return f"https://login.microsoftonline.com/{tenant}/oauth2/v2.0/authorize?{urlencode(params)}"
 
 
-async def exchange_code_for_tokens(code: str, *, code_verifier: Optional[str] = None) -> Dict[str, Any]:
-    if not (MS_CLIENT_ID and MS_REDIRECT_URI):
-        raise RuntimeError("MS_CLIENT_ID / MS_REDIRECT_URI are not set")
+import os
+import httpx
+
+async def exchange_code_for_tokens(code: str, code_verifier: str | None = None) -> dict:
+    tenant = os.environ["MS_TENANT_ID"]
+    token_url = f"https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token"
 
     data = {
-        "client_id": MS_CLIENT_ID,
+        "client_id": os.environ["MS_CLIENT_ID"],
+        "client_secret": os.environ["MS_CLIENT_SECRET"],
         "grant_type": "authorization_code",
         "code": code,
-        "redirect_uri": MS_REDIRECT_URI,
-        "scope": MS_SCOPES,
+        "redirect_uri": os.environ["MS_REDIRECT_URI"],
+        "scope": os.environ.get(
+            "MS_GRAPH_SCOPES",
+            "openid profile email offline_access User.Read Group.Read.All GroupMember.Read.All Tasks.Read",
+        ),
     }
-    if MS_CLIENT_SECRET:
-        data["client_secret"] = MS_CLIENT_SECRET
+
     if code_verifier:
         data["code_verifier"] = code_verifier
 
     async with httpx.AsyncClient(timeout=30) as client:
-        resp = await client.post(_token_url(), data=data, headers={"Accept": "application/json"})
-        if resp.status_code >= 400:
-            try:
-                detail = resp.json()
-            except Exception:
-                detail = resp.text
-            raise httpx.HTTPStatusError(
-                f"Microsoft token exchange failed: {resp.status_code} {detail}",
-                request=resp.request,
-                response=resp,
-            )
+        resp = await client.post(token_url, data=data)
+        resp.raise_for_status()
         return resp.json()
 
 
