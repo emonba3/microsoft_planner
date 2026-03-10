@@ -15,12 +15,8 @@ OIDC_CLIENT_SECRET = os.environ.get("OIDC_CLIENT_SECRET") or os.environ.get("MS_
 OIDC_REDIRECT_URI = os.environ.get("OIDC_REDIRECT_URI") or os.environ.get("MS_REDIRECT_URI")
 OIDC_SCOPES = os.environ.get(
     "OIDC_SCOPES",
-    os.environ.get(
-        "MS_SCOPES",
-        "openid profile email offline_access User.Read Tasks.Read GroupMember.Read.All User.ReadBasic.All",
-    ),
+    "openid profile email offline_access User.Read",
 )
-OIDC_AUDIENCE = os.environ.get("OIDC_AUDIENCE")
 _discovery_cache = None
 
 
@@ -49,8 +45,6 @@ async def build_login_url(state: str, *, code_challenge: Optional[str] = None) -
         "scope": OIDC_SCOPES,
         "state": state,
     }
-    if OIDC_AUDIENCE:
-        params["audience"] = OIDC_AUDIENCE
     if code_challenge:
         params["code_challenge"] = code_challenge
         params["code_challenge_method"] = "S256"
@@ -66,6 +60,7 @@ async def exchange_code_for_tokens(code: str, *, code_verifier: Optional[str] = 
         "client_id": OIDC_CLIENT_ID,
         "redirect_uri": OIDC_REDIRECT_URI,
         "code": code,
+        "scope": OIDC_SCOPES,
     }
     if OIDC_CLIENT_SECRET:
         data["client_secret"] = OIDC_CLIENT_SECRET
@@ -87,16 +82,6 @@ async def exchange_code_for_tokens(code: str, *, code_verifier: Optional[str] = 
 
 
 async def fetch_userinfo(access_token: str) -> dict:
-    d = await oidc_discovery()
-    userinfo_endpoint = d.get("userinfo_endpoint")
-    if userinfo_endpoint:
-        async with httpx.AsyncClient(timeout=15) as client:
-            r = await client.get(
-                userinfo_endpoint,
-                headers={"Authorization": f"Bearer {access_token}", "Accept": "application/json"},
-            )
-            if r.status_code < 400:
-                return r.json()
     async with httpx.AsyncClient(timeout=15) as client:
         r = await client.get(
             "https://graph.microsoft.com/v1.0/me",
