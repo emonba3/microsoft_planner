@@ -5,19 +5,19 @@ from typing import Optional, List, Dict, Any
 from sqlalchemy import String, Text, DateTime, select
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
+from sqlalchemy.exc import OperationalError
+from dotenv import load_dotenv
+load_dotenv()
 
 
 def utcnow():
     return datetime.now(timezone.utc)
 
-
 SQLITE_PATH = os.environ.get("SQLITE_PATH", "./planner_mcp.sqlite3")
-DATABASE_URL = f"sqlite+aiosqlite:///{SQLITE_PATH}"
-
+DATABASE_URL = os.environ.get("DATABASE_URL") or f"sqlite+aiosqlite:///{SQLITE_PATH}"
 
 class Base(DeclarativeBase):
     pass
-
 
 class PlannerConnection(Base):
     __tablename__ = "planner_connections"
@@ -29,14 +29,18 @@ class PlannerConnection(Base):
     access_token_expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
 
-
 engine = create_async_engine(DATABASE_URL, echo=False, future=True)
 AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
 
-
 async def init_db() -> None:
     async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+        try:
+            await conn.run_sync(Base.metadata.create_all)
+        except OperationalError as e:
+            msg = str(e).lower()
+            if "already exists" in msg and "planner_connections" in msg:
+                return
+            raise
 
 
 async def delete_connection(user_id: str, tenant_id: str) -> bool:
