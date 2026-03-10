@@ -13,10 +13,7 @@ OIDC_ISSUER = os.environ.get("OIDC_ISSUER", "").rstrip("/") + "/"
 OIDC_CLIENT_ID = os.environ.get("OIDC_CLIENT_ID") or os.environ.get("MS_CLIENT_ID")
 OIDC_CLIENT_SECRET = os.environ.get("OIDC_CLIENT_SECRET") or os.environ.get("MS_CLIENT_SECRET")
 OIDC_REDIRECT_URI = os.environ.get("OIDC_REDIRECT_URI") or os.environ.get("MS_REDIRECT_URI")
-OIDC_SCOPES = os.environ.get(
-    "OIDC_SCOPES",
-    "openid profile email offline_access User.Read",
-)
+OIDC_SCOPES = os.environ.get("OIDC_SCOPES", "openid profile email offline_access User.Read")
 _discovery_cache = None
 
 
@@ -68,16 +65,7 @@ async def exchange_code_for_tokens(code: str, *, code_verifier: Optional[str] = 
         data["code_verifier"] = code_verifier
     async with httpx.AsyncClient(timeout=15) as client:
         r = await client.post(d["token_endpoint"], data=data, headers={"Accept": "application/json"})
-    if r.status_code >= 400:
-        try:
-            detail = r.json()
-        except Exception:
-            detail = r.text
-        raise httpx.HTTPStatusError(
-            f"OIDC token exchange failed: {r.status_code} {detail}",
-            request=r.request,
-            response=r,
-        )
+    r.raise_for_status()
     return r.json()
 
 
