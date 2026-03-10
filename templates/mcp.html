@@ -1,40 +1,30 @@
-<!doctype html>
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-  <meta charset="utf-8" />
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>MCP Setup</title>
   <style>
-    body { font-family: ui-sans-serif, system-ui; margin: 24px; background:#0b0f19; color:#e6e8ef; }
-    a { color:#9ad1ff; }
-    .card { background:#121a2a; border: 1px solid #1f2a44; border-radius: 14px; padding: 16px; margin: 14px 0; }
-    code { background:#0f1730; padding:2px 6px; border-radius:8px; }
-    .muted { color:#9aa6c0; }
-    ol li { margin: 8px 0; }
-    .btn { display:inline-block; padding:10px 14px; border-radius: 12px; border: 1px solid #2b3b63; background:#0f1730; text-decoration:none; }
-    .btn:hover { background:#142048; }
+    body { font-family: Arial, sans-serif; margin: 0; background: #0b1220; color: #e5e7eb; }
+    .wrap { max-width: 900px; margin: 0 auto; padding: 32px 20px; }
+    .card { background: #111827; border: 1px solid #1f2937; border-radius: 16px; padding: 20px; margin-bottom: 20px; }
+    code { background: #0f172a; padding: 2px 6px; border-radius: 6px; }
+    a { color: #93c5fd; }
   </style>
 </head>
 <body>
-  <h1>Use this MCP Server in ChatGPT</h1>
-  <p class="muted">Signed in as: {{ user.name or user.email or user.sub }}</p>
+  <div class="wrap">
+    <div class="card">
+      <h1>MCP Setup</h1>
+      <p>Use this MCP URL in your client:</p>
+      <p><code>{{ mcp_url }}</code></p>
+      <p>The MCP transport is protected by OAuth and exposes Microsoft 365 Planner retrieval tools.</p>
+    </div>
 
-  <div class="card">
-    <h3 style="margin-top:0;">MCP Server URL</h3>
-    <p><code>{{ mcp_url }}</code></p>
-    <p class="muted">Add in ChatGPT → Developer Mode → New App → paste this URL → choose OAuth.</p>
+    <div class="card">
+      <h2>Included tool coverage</h2>
+      <p>Users, groups, group members, group plans, plan buckets, plan tasks, task details, full project snapshots, and user work-progress summaries.</p>
+    </div>
   </div>
-
-  <div class="card">
-    <h3 style="margin-top:0;">Workflow</h3>
-    <ol>
-      <li>Add the MCP server (OAuth) using the URL above.</li>
-      <li>In ChatGPT, run tool <code>qbo_connect_company</code>.</li>
-      <li>Open the returned <code>connect_url</code> and choose the client company in Intuit.</li>
-      <li>Repeat for each client company.</li>
-      <li>Use <code>qbo_list_companies</code> and <code>qbo_query_all</code>.</li>
-    </ol>
-  </div>
-
-  <a class="btn" href="/ui">Back to dashboard</a>
 </body>
 </html>

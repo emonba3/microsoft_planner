@@ -5,10 +5,10 @@ import secrets
 import hashlib
 import base64
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, Query
 from fastapi.responses import RedirectResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
-from fastapi import Query
+
 from app import db
 from app.oidc_client import build_login_url, exchange_code_for_tokens, fetch_userinfo
 
@@ -34,32 +34,22 @@ async def dashboard(request: Request):
     if not user_id:
         return RedirectResponse("/ui/login")
 
-    companies = await db.list_connections(user_id)
+    connections = await db.list_connections(user_id)
     base = os.environ.get("PUBLIC_BASE_URL", "").rstrip("/")
     mcp_url = f"{base}/mcp" if base else "/mcp"
-
     return templates.TemplateResponse(
         "dashboard.html",
-        {
-            "request": request,
-            "user": request.session.get("user"),
-            "companies": companies,
-            "mcp_url": mcp_url,
-        },
+        {"request": request, "user": request.session.get("user"), "connections": connections, "mcp_url": mcp_url},
     )
 
 
 @router.get("/login")
 async def login(request: Request):
-    # OAuth state
     state = secrets.token_urlsafe(24)
     request.session["oidc_state"] = state
-
-    # PKCE (works for both public and confidential clients; some IdPs require it)
     verifier = secrets.token_urlsafe(64)
     request.session["oidc_code_verifier"] = verifier
     challenge = _pkce_challenge(verifier)
-
     return RedirectResponse(await build_login_url(state, code_challenge=challenge))
 
 
@@ -69,11 +59,9 @@ async def callback(request: Request, code: str, state: str):
         return HTMLResponse("Invalid state", status_code=400)
 
     verifier = request.session.get("oidc_code_verifier")
-
     try:
         tokens = await exchange_code_for_tokens(code, code_verifier=verifier)
     except Exception as e:
-        # Show provider error in UI to speed up debugging.
         return HTMLResponse(f"OIDC token exchange failed: {e}", status_code=500)
 
     access_token = tokens.get("access_token")
@@ -85,33 +73,30 @@ async def callback(request: Request, code: str, state: str):
             userinfo = {}
 
     user = {
-        "email": userinfo.get("email"),
-        "sub": userinfo.get("sub") or userinfo.get("user_id"),
-        "name": userinfo.get("name") or userinfo.get("nickname"),
+        "email": userinfo.get("email") or userinfo.get("preferred_username"),
+        "sub": userinfo.get("sub") or userinfo.get("oid") or userinfo.get("id"),
+        "name": userinfo.get("name") or userinfo.get("preferred_username"),
     }
     request.session["user"] = user
-
     return RedirectResponse("/ui")
 
 
 @router.get("/logout")
 async def logout(request: Request):
     request.session.clear()
-
-    issuer = os.environ.get("OIDC_ISSUER", "").rstrip("/")
-    post_logout = (os.environ.get("PUBLIC_BASE_URL", "").rstrip("/") or "") + "/ui"
-    # Auth0 typically uses /v2/logout
-    if issuer:
-        return RedirectResponse(f"{issuer}/v2/logout?returnTo={post_logout}")
     return RedirectResponse("/ui")
 
 
-@router.get("/connect-qbo")
-async def connect_qbo(request: Request):
+@router.get("/connect-planner")
+async def connect_planner(request: Request):
     user_id = _uid(request)
     if not user_id:
         return RedirectResponse("/ui/login")
-    return RedirectResponse(f"/intuit/connect?state={user_id}")
+    state = secrets.token_urlsafe(24)
+    request.session["ms_state"] = state
+    verifier = secrets.token_urlsafe(64)
+    request.session["ms_code_verifier"] = verifier
+    return RedirectResponse(f"/microsoft/connect?state={state}")
 
 
 @router.get("/mcp", response_class=HTMLResponse)
@@ -123,19 +108,14 @@ async def mcp_page(request: Request):
     mcp_url = f"{base}/mcp" if base else "/mcp"
     return templates.TemplateResponse(
         "mcp.html",
-        {
-            "request": request,
-            "user": request.session.get("user"),
-            "mcp_url": mcp_url,
-        },
+        {"request": request, "user": request.session.get("user"), "mcp_url": mcp_url},
     )
 
 
-@router.post("/disconnect-qbo")
-async def disconnect_qbo(request: Request, realm_id: str = Query(...)):
+@router.post("/disconnect-planner")
+async def disconnect_planner(request: Request, tenant_id: str = Query(...)):
     user_id = _uid(request)
     if not user_id:
         return RedirectResponse("/ui/login", status_code=302)
-
-    await db.delete_connection(user_id, realm_id)
+    await db.delete_connection(user_id, tenant_id)
     return RedirectResponse("/ui", status_code=302)
