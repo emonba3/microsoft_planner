@@ -15,7 +15,7 @@ MS_CLIENT_SECRET = os.environ.get("MS_CLIENT_SECRET") or os.environ.get("OIDC_CL
 MS_TENANT_ID = os.environ.get("MS_TENANT_ID", "common")
 MS_REDIRECT_URI = os.environ.get("MS_REDIRECT_URI") or os.environ.get("OIDC_REDIRECT_URI")
 MS_SCOPES = os.environ.get(
-    "MS_SCOPES",
+    "MS_GRAPH_SCOPES",
     "openid profile email offline_access User.Read Tasks.Read GroupMember.Read.All User.ReadBasic.All",
 )
 
