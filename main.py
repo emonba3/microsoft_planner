@@ -67,6 +67,13 @@ def root():
 def health():
     return {"ok": True}
 
+@app.get("/")
+async def root():
+    return {"ok": True, "service": "Microsoft 365 Planner MCP Server", "ui": "/ui", "mcp": "/mcp"}
+
+@app.head("/")
+async def root_head():
+    return
 
 @app.get("/microsoft/connect")
 async def microsoft_connect(request: Request, state: str):
