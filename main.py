@@ -187,9 +187,13 @@ def _resource_url(request: Request) -> str:
 @app.get("/.well-known/oauth-protected-resource/mcp")
 def oauth_protected_resource(request: Request):
     issuer = _normalized_issuer_from_env()
+    base = _public_base_url_from_request(request).rstrip("/")
+    auth_server_metadata = f"{base}/.well-known/oauth-authorization-server/mcp" if base else "/.well-known/oauth-authorization-server/mcp"
+
     return {
         "resource": _resource_url(request),
         "authorization_servers": [issuer] if issuer else [],
+        "authorization_server_metadata": auth_server_metadata,
         "scopes_supported": _supported_scopes(),
         "bearer_methods_supported": ["header"],
         "resource_documentation": os.environ.get("RESOURCE_DOCUMENTATION"),
@@ -197,6 +201,7 @@ def oauth_protected_resource(request: Request):
 
 
 @app.get("/.well-known/oauth-authorization-server")
+@app.get("/.well-known/oauth-authorization-server/mcp")
 def oauth_authorization_server():
     return {
         "issuer": _normalized_issuer_from_env(),
@@ -212,6 +217,7 @@ def oauth_authorization_server():
 
 
 @app.get("/.well-known/openid-configuration")
+@app.get("/.well-known/openid-configuration/mcp")
 def openid_configuration():
     return {
         "issuer": _normalized_issuer_from_env(),
@@ -298,6 +304,22 @@ class MCPHttpOAuthWrapper:
             return
         body_buf = self._BodyBuffer(receive)
         path = (scope.get("path") or "").rstrip("/")
+        public_mcp_discovery_paths = {
+                "/mcp/.well-known/oauth-authorization-server",
+                "/mcp/.well-known/openid-configuration",
+                "/mcp/.well-known/oauth-protected-resource",
+            }
+
+        if path in public_mcp_discovery_paths:
+            rewritten_scope = dict(scope)
+            if path == "/mcp/.well-known/oauth-authorization-server":
+                rewritten_scope["path"] = "/.well-known/oauth-authorization-server"
+            elif path == "/mcp/.well-known/openid-configuration":
+                rewritten_scope["path"] = "/.well-known/openid-configuration"
+            elif path == "/mcp/.well-known/oauth-protected-resource":
+                rewritten_scope["path"] = "/.well-known/oauth-protected-resource"
+            await self._app(rewritten_scope, receive, send)
+            return
         if not (path == "/mcp" or path.startswith("/mcp/") or path == "/sse" or path.startswith("/sse/")):
             await self._app(scope, receive, send)
             return
