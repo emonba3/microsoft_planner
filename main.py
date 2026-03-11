@@ -99,7 +99,14 @@ async def microsoft_callback(request: Request, code: str, state: Optional[str] =
     expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
 
     user = request.session.get("user") or {}
-    user_id = (user.get("sub") or user.get("email") or me.get("id") or "unknown_user").strip()
+    user_id = (
+        user.get("email")
+        or user.get("sub")
+        or me.get("mail")
+        or me.get("userPrincipalName")
+        or me.get("id")
+        or "unknown_user"
+    ).strip().lower()
 
     await db.upsert_connection(
         user_id=user_id,
@@ -374,7 +381,10 @@ class MCPHttpOAuthWrapper:
             await resp(scope, receive, send)
             return
 
-        token = current_user.set({"sub": claims.get("sub"), "email": claims.get("email")})
+        token = current_user.set({
+            "sub": claims.get("sub"),
+            "email": (claims.get("email") or "").strip().lower() or None,
+        })
         try:
             await self._app(scope, body_buf.replay, send)
         finally:
