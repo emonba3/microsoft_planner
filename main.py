@@ -58,10 +58,6 @@ if os.environ.get("ENABLE_TRUSTED_HOST", "0").lower() in {"1", "true", "yes"}:
 app.include_router(ui_router)
 
 
-@app.get("/")
-def root():
-    return {"ok": True, "service": "Microsoft 365 Planner MCP Server", "ui": "/ui", "mcp": "/mcp"}
-
 
 @app.get("/health")
 def health():
@@ -69,11 +65,12 @@ def health():
 
 @app.get("/")
 async def root():
-    return {"ok": True, "service": "Microsoft 365 Planner MCP Server", "ui": "/ui", "mcp": "/mcp"}
+    return {"ok": True, "service": "Planner MCP Server", "ui": "/ui", "mcp": "/mcp"}
 
 @app.head("/")
 async def root_head():
     return
+
 
 @app.get("/microsoft/connect")
 async def microsoft_connect(request: Request, state: str):
