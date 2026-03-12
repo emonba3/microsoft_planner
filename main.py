@@ -383,7 +383,7 @@ class MCPHttpOAuthWrapper:
 
         token = current_user.set({
             "sub": claims.get("sub"),
-            "email": (claims.get("email") or "").strip().lower() or None,
+            "email": ((claims.get("email") or "").strip().lower() or None),
         })
         try:
             await self._app(scope, body_buf.replay, send)
