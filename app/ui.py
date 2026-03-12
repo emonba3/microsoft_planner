@@ -20,7 +20,8 @@ def _uid(request: Request) -> str | None:
     u = request.session.get("user")
     if not u:
         return None
-    return u.get("sub") or u.get("email")
+    val = u.get("email") or u.get("sub")
+    return val.strip().lower() if isinstance(val, str) else val
 
 
 def _pkce_challenge(verifier: str) -> str:
